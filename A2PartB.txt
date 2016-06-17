@@ -1,0 +1,231 @@
+CPSC 457
+Assignment 2 - Part B
+Johnny Phuong Chung
+
+----------
+Question 1:
+The CEO is fired, the company folds, and you go interview at the bank your former CTO now works for. She asks you one question in the interview: Do you think it would be better to implement process tagging completely in userspace (for example, with a file called /etc/tags) or in the kernel like you did? Why? Do you get the job at the bank?
+
+
+Initial intuition would suggest that implementation of process tagging would be better in userspace, as it would be safer than tampering with system call tables and forking in the kernel. However, the underlying purpose of tagging processes is the ability to modify process attributes, which is not something that should be freely available in user space. 
+The tags may also be used for future implementation of process permissions via their tags, further exacerbating security concerns. For example, if future policy enforcement saw that certain processes have higher priority for scheduling, and process tagging was not restricted to kernel mode, then users could abuse the tags such that their processes are always highest priority, which could cause problems for the system if some processes that were supposed to run can't because of lower priority.
+
+As for the job, they would likely hire someone else, as the process tagging we implemented would only result in more problems than benefits due to its dependence on system calls, exploitability,and need for working knowledge of kernel space and user space privileges to actually use safely and effectively. The only reason that the program was made was at the behest of the CEO.
+
+----------
+Question 2:
+What are the differences between printf and printk? What are the differences between malloc and kmalloc? Why do we need different libraries to support kernel operations compared to user operations?
+
+The differences between printf and printk are as follows:
+- printf is a user function to write a formatted string to standard output (stdout), and its parameters are the char pointers of desired strings, and any related format specifiers.
+- printk, on the other hand, is a print function exclusive to the kernel, and requires a loglevel specification as a parameter, in addition to the printf parameters. The kernel will then print all messages below a specified loglevel priority. The printk function is also more robust than printf as the kernel can call it anywhere and in any context.
+
+The differences between malloc and kmalloc are as follows:
+- malloc is a user function that requests a block of memory bytes be allocated, with the size being specified as a parameter, and that a pointer to that newly allocated block be given as a return. If there is an unused block of memory that meets the requested size, it will be allocated and a pointer is given. If, however, the request cannot be met due to unavailable contiguous user memory, NULL is returned instead, as malloc cannot allocate kernel memory.
+- kmalloc, like printk, acts like its user space counterpart malloc, but also requires an additional int parameter to set flags. Since it is exclusive to the kernel, it is also not restricted to user memory and can allocate kernel memory. However, if no contgious memory of either mode is available to meet the request, NULL will still be returned. Furthermore, once memory in the kernel has been allocated and locked, that memory cannot be swapped.
+
+The reason for separate libraries for kernel operations and user operations is to separate the instruction set into privileged and nonprivileged subsets, with the kernel having the full privileged set while the user space is only allowed the nonprivileged set. Within the privileged set are all hardware/memory operations, which should not be freely available to all user applications as that could result in programs writing into another user or program's memory space. System resource access should be requested by user to the kernel, and done by the kernel on behalf of the user. 
+
+----------
+Question 3:
+Both the concepts of the root user (or an administrator account) and the kernel are similar and related, but they are not the same. How they are different and describe how they are similar?
+
+The kernel and the concept of a root (admin) user related in that both govern access over less priveleged users. 
+The admin has full access to the user space via superuser privileges, and manages the access of user space resources by less privileged users.
+Similarly, the kernel has full access to the hardware, and manages its access from user space via system calls. 
+However, despite its superuser privileges, the root user is still bound to the user space, and thus is still required to request hardware access from the kernel via system calls. The root user is also only allowed a subset of the full instruction set, whereas the kernel is unrestricted in both its memory access and its instruction set.
+
+----------
+Question 4:
+In some operating systems, such as Solaris, it's possible to add new system calls through loadable kernel modules. In others, such as Linux, it isn't possible. Why? What reasons are there for allowing LKMs to add system calls and what reasons are there for restricting this? Which approach do you favour?
+
+The reason that Linux cannot dynamically add new system calls via loadable kernel modules like Solaris can is because the size of the Linux syscall table is defined as a constant i.e. its size if fixed and contains no reserved empty entries in the table like in Solaris. Rather than adding new system calls, which would require the rebuilding of the kernel itself, Linux LKMs simulate new system calls by intercepting the pointers to the syscall table.
+
+Reasons for allowing LKMs to add system calls would include the ability to add functionality to, while also maintaining the integrity of, the working kernel i.e. usability. The interception of system calls can also be avoided, which requires careful management of pointers and concurrency.
+
+Reasons to restrict LKMs from adding system calls would include enforcing policy for kernel sizes due to hardware/memory restrictions, such as embedded devices. Security is also an issue, as adding LKM system calls without full knowledge of kernel logic and other system calls is dangerous practice.
+
+
+The approach that I would favor would be allowing LKMs to add system calls, as this does not require the need to manually find and alter the kernel system call table. This then avoids the problem of having to recompile the kernel or reboot the system, and the new system call could be implemented without interruption of service to the live kernel.
+
+----------
+Question 5:
+Threads can be implemented in user space or kernel space. Each way has benefits and draw backs. List some of the benefits and drawbacks of each. Discuss one situation where user space threads are a better choice and one situation where kernel space threadsa are a better choice.
+
+The benefits of user space threads are as follows:
++ OS implementation not a factor, can implement user thread packages even on OS that does not support threads
++ thread switching via a thread table is significantly faster than a kernel trap
++ can have separate thread scheduling algorithms for each process
++ scale better, don't require kernel table/stack space like kernel threads 
+
+The drawbacks of user space threads are as follows:
+- one blocked thread making a system call will result in the whole process being blocked (i.e. all threads blocked)
+- if a thread calls or jumps to an instruction not in memory (page fault), will also block entire process even though other threads might be able to run while that thread is waiting for I/O
+- difficult to schedule user threads, since no other threads in the process can run unless the current thread yields control of the CPU
+
+The benefits of kernel threads are as follows:
++ if a thread is blocked for system call/page fault, kernel can choose to run other other threads, either from same process or another process, so blocking problem of threads that occurs in user space is avoided
++ there is only one kernel thread table to manage instead of separate thread tables for each process
+
+The drawbacks of kernel threads are as follows:
+- all thread blocking operations are implemented as system calls, each of which causes significant runtime overhead
+- the kernel must now also manage all threads on top of managing all processes, further adding to overhead
+
+A situation where you may want to favor user threads would be when high throughput is required, which can be achieved since user threads are light and have low runtime not requiring interaction with the kernel. Conversely, you would want to favor kernel threads in applications that have frequent blocking, as that cannot be handled by user threads without blocking all threads of a process, or through wrappers.
+----------
+Question 6:
+Why would a thread ever voluntarily give up the CPU by calling thread_yield? Discuss the assumptions that allow us to think of threads as cooperative, but processes as antagonistic. (From Modern Operating Systems, Chapter 2)
+
+A thread may voluntarily yield control of the CPU with thread_yield if it is for the overall benefit of the process. Because threads share the same address space while also having their own registers and stack, they are able to perform operations seemingly in parallel while also moving the process towards completion. However, since there are no clock interrupts to enforce multithreading, functions like thread_yield are also necessary for cooparation, so that all threads will have a chance to run.
+
+----------
+Question 7:
+Five batch jobs (A, B, C, D, E) arrive to be scheduled at almost the same time. They have estimated burst times of 10, 6, 2, 4 and 8 ms respectively. Their (externally determined) priorities are 2, 0, 3, 4 and 1, with 0 being the highest priority. For each of the following algorithms calculate the the turnaround time for each job.
+
+    Round robin - with a quantum of 2ms
+    Priority scheduling
+    First-come, first served (assume they arrived in alphabetical order)
+    Shortest Job First (assume you have perfect knowledge of the burst times)
+
+Assume for 1. that the system is multiprogrammed and that each job gets its fare share of CPU. For 2. through 4. assume that once a job is started it will not be preempted until it finishes. Assume all jobs are completely CPU bound. (Modified from Modern Operating Systems, Chapter 2)
+
+	Job | Burst Time (ms)| Priority
+	--------------------------------
+	 A  |     10         |    2
+	 B  |      6         |    0
+	 C  |      2         |    3
+	 D  |      4         |    4
+	 E  |      8         |    1
+
+
+	Turnaround time = completion time - arrival time = burst time  + wait time
+
+Round Robin (quantum = 2ms):
+
+	Turnaround Time:
+	A = (30ms - 0ms) = 30ms
+	B = (22ms - 0ms) = 22ms
+	C = (6ms - 0ms) = 6ms
+	D = (16ms - 0ms) = 16ms
+	E = (28ms - 0ms) = 28ms
+
+	GANTT Chart:
+	0  2  4  6  8  10 12 14 16 18 20 22 24 26 28 30
+	| A| B| C| D| E| A| B| D| E| A| B| E| A| E| A|
+
+Priority Scheduling:
+	Turnaround Time:
+	A = (24ms - 0ms) = 24ms
+	B = (6ms - 0ms) = 6ms
+	C = (26ms - 0ms) = 26ms
+	D = (30ms - 0ms) = 30ms
+	E = (14ms - 0ms) = 14ms
+
+	GANTT Chart:
+	0      6        14         24  26    30
+	|   B  |  E     |    A     | C |  D  |
+
+
+First-come, First served:
+	Turnaround Time:
+	A = (10ms - 0ms) = 10ms
+	B = (16ms - 0ms) = 16ms
+	C = (18ms - 0ms) = 18ms
+	D = (22ms - 0ms) = 22ms
+	E = (30ms - 0ms) = 30ms
+
+	GANTT Chart:
+	0          10     16  18    22       30
+	|     A    |  B   | C | D  |    E    |
+
+Shortest Job First:
+	Turnaround Time:
+	A = (30ms - 0ms) = 30ms
+	B = (12ms - 0ms) = 12ms
+	C = (2ms - 0ms) = 2ms
+	D = (6ms - 0ms) = 6ms
+	E = (20ms - 0ms) = 20ms
+
+	GANTT Chart:
+	0   2    6      12        20         30
+	| C | D  |  B   |    E    |     A    |
+
+
+----------
+Question 8:
+Explain how time quantum value and context switching time affect each other in a round robin scheduling algorithm. (From Modern Operating Systems, Chapter 2)
+
+For round robin scheduling, upon completion of its alloted quantum time on the CPU, a process is preempted for the next process in the RR queue via a context switch. As such, it is crucial that the quantum time be proportional to the time required for context switching. 
+If a quantum is too short, that results in more context switching, which may cause significant runtime overhead if context switch time is large. Conversely, too long of a quantum is inefficient due to CPU idle time, especially if context switch time is small.
+Thus, if context switch time is small or negligible, quantum time can be lower to maximize CPU efficiency, while large context switch times require proportionally large quantum times to mitigate switching overhead.
+
+----------
+Question 9:
+ Consider the following piece of C code:
+
+
+    void main(int argc, char *argv[]) {
+    	fork();
+    	fork();
+    	exit();
+    }
+
+
+
+How many processes are created? Justify your answer and draw a tree describing the process family (ascii trees are good)(From Modern Operating Systems, Chapter 2)
+
+From the given C code, the first fork() command creates a copy of the initial (parent) process, while the second fork() command has both the parent and child process forking their own child processes. As such, the code results in 4 running processes prior to exit: 1 parent process, and 3 created child processes.
+
+	  P
+       	/   \
+      C1     P
+     /  \   / \
+   C3   C1 C2  P
+
+----------
+Question 10:
+The exec() family of functions wrap the function execve, which executes a program. What purposes do the wrapper functions serve? What information about a process does execve preserve and what information does it not preserve? Why does execve not have a return condition?
+
+The purpose of the wrapper functions of the exec() family is to replace the current process image with a new process image. This is necessary as fork() creates a duplicate of the calling process when creating new processes.  
+Within the exec() family, the process execve preserves the passed argument string array (argv) and the array of environment variables (envp) of a process, but does not preserve the text, data, stack, or bss, as those are overwritten for the execution of new processes. Additionally, all allocated memory of the old process is also not preserved.
+As such, execve() does not have a return value because there is no calling code to return to, as the calling process' original program text was overwritten by the new process.
+
+----------
+REFERENCES:
+- Question 1:
+	Mike Clark
+- Question 2:
+	http://www.tutorialspoint.com/c_standard_library/c_function_printf.htm
+	http://www.makelinux.net/books/lkd2/ch18lev1sec3
+	http://www.tutorialspoint.com/c_standard_library/c_function_malloc.htm
+	http://www.makelinux.net/books/lkd2/ch11lev1sec4
+	http://stackoverflow.com/questions/5957570/what-is-the-difference-between-the-kernel-space-and-the-user-space
+
+- Question 4:
+	http://stackoverflow.com/questions/2394985/linux-kernel-add-system-call-dynamically-through-module
+	https://www.quora.com/Is-it-possible-to-add-a-System-Call-via-a-Loadable-Kernel-Module
+	http://www.linuxjournal.com/article/4378
+	http://books.gigatux.nl/mirror/networksecuritytools/0596007949/networkst-CHP-7-SECT-2.html
+
+- Question 5:
+	Modern Operating System - 4th Edition (Tanenbaum and Bos, 2014), Chapter 2
+	http://stackoverflow.com/questions/15983872/difference-between-user-level-and-kernel-supported-threads
+	http://www.cs.iit.edu/~cs561/cs450/ChilkuriDineshThreads/dinesh's%20files/User%20and%20Kernel%20Level%20Threads.html
+
+- Question 6:
+	Modern Operating System - 4th Edition (Tanenbaum and Bos, 2014), Chapter 2
+
+- Question 7:
+	N/A
+
+- Question 8:
+	Modern Operating System - 4th Edition (Tanenbaum and Bos, 2014), Chapter 2
+
+- Question 9:
+	https://www.quora.com/How-could-I-calculate-the-number-of-processes-generated-using-N-fork-statements
+
+- Question 10:
+	Modern Operating System - 4th Edition (Tanennaum and Bos, 2014), Chapter 2
+	http://linux.die.net/man/3/exec
+	http://linux.die.net/man/2/execve
+	http://stackoverflow.com/questions/12016441/execve-and-environment-variables
