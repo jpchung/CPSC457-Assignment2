@@ -22,3 +22,10 @@ ASSUMPTIONS/COMMENTS:
 - system call compiles, but warnings are still present
 
 SOURCES:
+	http://lxr.cpsc.ucalgary.ca/lxr/#linux+v2.6.32/include/linux/sched.h#L1215
+	http://www.ibm.com/developerworks/library/l-kernel-memory-access/
+	http://lxr.free-electrons.com/source/include/linux/pid.h
+	http://www.makelinux.net/books/lkd2/ch11lev1sec4
+	http://stackoverflow.com/questions/11223523/what-is-the-meaning-of-gfp-in-kmalloc-flags
+	https://www.kernel.org/doc/htmldocs/kernel-hacking/routines-kmalloc.html
+	http://www.makelinux.net/ldd3/chp-11-sect-5
