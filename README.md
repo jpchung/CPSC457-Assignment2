@@ -5,8 +5,8 @@ DESCRIPTION:
 
 COMPILE/RUN: 
 - Apply the patch linux-2.6.32.A2.patch to corresponding PRISTINE linux kernel (linux-2.6.32.22)
-- Use Makefile to compile and link the ptag program
-- use command $./ptag to run program
+- Navigate to directory containing user level ptag program and use $make command to compile and link via the Makefile
+- Use command $./ptag to run program
 
 USAGE: $./gls pid -mode tag
 - pid = process ID

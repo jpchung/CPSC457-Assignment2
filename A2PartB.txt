@@ -187,7 +187,7 @@ Question 10:
 The exec() family of functions wrap the function execve, which executes a program. What purposes do the wrapper functions serve? What information about a process does execve preserve and what information does it not preserve? Why does execve not have a return condition?
 
 The purpose of the wrapper functions of the exec() family is to replace the current process image with a new process image. This is necessary as fork() creates a duplicate of the calling process when creating new processes.  
-Within the exec() family, the process execve preserves the passed argument string array (argv) and the array of environment variables (envp) of a process, but does not preserve the text, data, stack, or bss, as those are overwritten for the execution of new processes. Additionally, all allocated memory of the old process is also not preserved.
+Within the exec() family, the process execve preserves the passed argument string array (argv), the array of environment variables (envp) of a process, and the file descriptor. It does not, however, preserve the text, data, stack, or bss, as those are overwritten for the execution of new processes. Additionally, all allocated memory of the old process is also not preserved.
 As such, execve() does not have a return value because there is no calling code to return to, as the calling process' original program text was overwritten by the new process.
 
 ----------
