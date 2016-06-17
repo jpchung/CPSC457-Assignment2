@@ -20,6 +20,7 @@ ASSUMPTIONS/COMMENTS:
 - nested structures for tag and tag list were originally implemented, but pointer management proved difficult and hindered kernel compilation
 - forking ,tagstat and tagkill utitilities were not implemented due to time constraints
 - system call compiles, but warnings are still present
+- tag is printed at tail of kernel messages
 
 SOURCES:
 - http://lxr.cpsc.ucalgary.ca/lxr/#linux+v2.6.32/include/linux/sched.h#L1215
